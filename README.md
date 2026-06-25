@@ -64,6 +64,4 @@ Each dashboard features:
 - Multiple chart types (scatter, bar, radar, histogram, box)
 - Sortable data tables
 
-## 📄 License
 
-MIT License
