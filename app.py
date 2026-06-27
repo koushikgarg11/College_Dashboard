@@ -8,8 +8,8 @@ import re
 from data_utils import load_data
 
 st.set_page_config(
-    page_title="EduRank India | College Intelligence Platform",
-    page_icon="🎓",
+    page_title="NexusIQ — India's Tier 1 Engineering Intelligence Vault",
+    page_icon="🔬",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -233,9 +233,9 @@ with st.sidebar:
         <div style='font-family:Space Grotesk; font-size:1.2rem; font-weight:700;
              background:linear-gradient(135deg,#a5b4fc,#67e8f9);
              -webkit-background-clip:text; -webkit-text-fill-color:transparent;'>
-            🎓 EduRank India
+            🔬 NexusIQ
         </div>
-        <div style='font-size:11px; color:#475569; margin-top:2px;'>College Intelligence Platform</div>
+        <div style='font-size:11px; color:#475569; margin-top:2px;'>India's Tier 1 Engineering Intelligence Vault</div>
     </div>""", unsafe_allow_html=True)
 
     page = st.selectbox("📊 Dashboard", [
@@ -285,9 +285,9 @@ def safe_metric(label, val, delta=None):
 # PAGE 0 – OVERVIEW & HIGHLIGHTS
 # ═══════════════════════════════════════════════════════════════
 if page == "🏠 Overview & Highlights":
-    hero("India College Intelligence Platform",
-         "Comprehensive analytics across placements, packages, recruiters & ROI for India's top 44 engineering colleges",
-         "OVERVIEW DASHBOARD")
+    hero("NexusIQ — India's Tier 1 Engineering Intelligence Vault",
+         "The definitive database of India's premier engineering colleges — placements, packages, recruiters & ROI, all in one place",
+         "TIER 1 ENGINEERING DATABASE")
 
     # Top KPIs
     all_rec = [r for lst in fdf["Recruiter List"] for r in lst]
@@ -324,8 +324,8 @@ if page == "🏠 Overview & Highlights":
                               f"Avg Placement: {row['Avg_Placement']:.1f}%<br>"
                               f"Avg Package: ₹{row['Avg_Package']:.1f} LPA<extra></extra>"
             ))
-        fig.update_layout(**BASE, title="Colleges by Tier", showlegend=False,
-                          yaxis=dict(**BASE["yaxis"], title="Count"))
+        fig.update_layout(**BASE, title="Colleges by Tier", showlegend=False)
+        fig.update_yaxes(title_text="Count")
         st.plotly_chart(fig, use_container_width=True)
 
     with c2:
@@ -380,9 +380,9 @@ if page == "🏠 Overview & Highlights":
             showscale=True,
             colorbar=dict(tickfont=dict(color="#64748b"))
         ))
-        fig5.update_layout(**BASE, title="Avg Package (LPA) — State × Tier Heatmap",
-                           xaxis=dict(**BASE["xaxis"], title=""),
-                           yaxis=dict(**BASE["yaxis"], title=""))
+        fig5.update_layout(**BASE, title="Avg Package (LPA) — State × Tier Heatmap")
+        fig5.update_xaxes(title_text="")
+        fig5.update_yaxes(title_text="")
         st.plotly_chart(fig5, use_container_width=True)
 
     # ── Row 3 – Quick Insights ──
@@ -710,9 +710,9 @@ elif page == "💼 Placement Analysis":
                                   textfont=dict(color="#e2e8f0")))
             fig7.update_layout(**BASE, title="Tier: Placement % vs Package",
                                barmode="group",
-                               yaxis=dict(**BASE["yaxis"], title="Placement %"),
                                yaxis2=dict(title="Package (LPA)", overlaying="y", side="right",
                                            tickfont=dict(color="#475569")))
+            fig7.update_yaxes(title_text="Placement %", secondary_y=False)
             st.plotly_chart(fig7, use_container_width=True)
 
         with c2:
@@ -743,9 +743,8 @@ elif page == "💼 Placement Analysis":
             showscale=True,
             colorbar=dict(tickfont=dict(color="#64748b"))
         ))
-        fig9.update_layout(**BASE, title="Correlation Matrix — Key Metrics",
-                           xaxis=dict(**BASE["xaxis"], tickangle=30),
-                           yaxis=dict(**BASE["yaxis"]))
+        fig9.update_layout(**BASE, title="Correlation Matrix — Key Metrics")
+        fig9.update_xaxes(tickangle=30)
         st.plotly_chart(fig9, use_container_width=True)
 
 
