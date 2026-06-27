@@ -6,7 +6,7 @@ def load_data():
     df = pd.read_excel("Final_Data_1.xlsx", sheet_name="Colleges_List")
     df = df.dropna(subset=["College Name"])
 
-    # ── Avg Package → numeric (midpoint of range) ─────────────────────────
+    #  Avg Package → numeric (midpoint of range) 
     def parse_pkg(val):
         if pd.isna(val):
             return None
@@ -23,7 +23,7 @@ def load_data():
 
     df["Avg Pkg (LPA)"] = df["Avg Pkg"].apply(parse_pkg)
 
-    # ── Highest Package → numeric (domestic preferred, CR→LPA) ───────────
+    #  Highest Package → numeric (domestic preferred, CR→LPA) 
     def parse_highest(val):
         if pd.isna(val):
             return None
@@ -41,7 +41,7 @@ def load_data():
 
     df["Highest Pkg (LPA)"] = df["Highest Pkg"].apply(parse_highest)
 
-    # ── Tier classification ───────────────────────────────────────────────
+    # Tier classification
     def get_tier(row):
         cat = str(row.get("Category", ""))
         rank = row.get("NIRF Rank", None)
@@ -54,7 +54,7 @@ def load_data():
 
     df["Tier"] = df.apply(get_tier, axis=1)
 
-    # ── Alumni count (numeric) ────────────────────────────────────────────
+    # Alumni count (numeric)
     def alumni_num(v):
         if pd.isna(v):
             return None
@@ -65,7 +65,7 @@ def load_data():
 
     df["Alumni Count"] = df["Alumni Network Strength"].apply(alumni_num)
 
-    # ── Internship companies list ─────────────────────────────────────────
+    #Internship companies list 
     def intern_cos(v):
         if pd.isna(v):
             return []
@@ -77,7 +77,7 @@ def load_data():
     df["Internship Companies"] = df["Internship Opportunities"].apply(intern_cos)
     df["Internship Count"] = df["Internship Companies"].apply(len)
 
-    # ── Recruiter & partner lists ─────────────────────────────────────────
+    # Recruiter & partner lists 
     def split_c(v):
         if pd.isna(v):
             return []
@@ -88,7 +88,7 @@ def load_data():
     df["Partner List"] = df["Industry Partnerships"].apply(split_c)
     df["Partner Count"] = df["Partner List"].apply(len)
 
-    # ── ROI Score ─────────────────────────────────────────────────────────
+    #  ROI Score
     df["ROI Score"] = (df["Placement %"] * df["Avg Pkg (LPA)"] / 100).round(2)
 
     return df
