@@ -2,1173 +2,738 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 from collections import Counter
 import re
 from data_utils import load_data
 
 st.set_page_config(
-    page_title="NexusIQ — India's Tier 1 Engineering Intelligence Vault",
-    page_icon="🔬",
+    page_title="India College Analytics Dashboard",
+    page_icon="🎓",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# ══════════════════════════════════════════════════════════════════════════════
-# GLOBAL CSS
-# ══════════════════════════════════════════════════════════════════════════════
+# ── Custom CSS ──────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap');
-
-html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
-
-.stApp {
-    background: #060b18;
-    background-image:
-        radial-gradient(ellipse at 20% 20%, rgba(99,102,241,0.08) 0%, transparent 50%),
-        radial-gradient(ellipse at 80% 80%, rgba(6,182,212,0.06) 0%, transparent 50%);
-}
-
-/* ── Sidebar ── */
-[data-testid="stSidebar"] {
-    background: linear-gradient(180deg, #0d1526 0%, #060b18 100%);
-    border-right: 1px solid rgba(99,102,241,0.2);
-}
-[data-testid="stSidebar"] * { color: #cbd5e1 !important; }
-[data-testid="stSidebar"] .stSelectbox > div > div,
-[data-testid="stSidebar"] .stMultiSelect > div > div {
-    background: rgba(30,41,59,0.8);
-    border: 1px solid rgba(99,102,241,0.3);
-    border-radius: 8px;
-    color: #e2e8f0 !important;
-}
-
-/* ── Metric cards ── */
-[data-testid="metric-container"] {
-    background: linear-gradient(135deg, rgba(30,41,59,0.9), rgba(15,23,42,0.9));
-    border: 1px solid rgba(99,102,241,0.25);
-    border-radius: 16px;
-    padding: 20px 16px;
-    backdrop-filter: blur(10px);
-    transition: border-color 0.3s;
-}
-[data-testid="metric-container"]:hover { border-color: rgba(99,102,241,0.6); }
-[data-testid="stMetricLabel"] { color: #64748b !important; font-size: 12px !important; text-transform: uppercase; letter-spacing: 0.05em; }
-[data-testid="stMetricValue"] { color: #f8fafc !important; font-size: 26px !important; font-weight: 800 !important; font-family: 'Space Grotesk', sans-serif !important; }
-[data-testid="stMetricDelta"] { color: #4ade80 !important; }
-
-/* ── Hero banner ── */
-.hero-banner {
-    background: linear-gradient(135deg, rgba(99,102,241,0.15) 0%, rgba(6,182,212,0.1) 100%);
-    border: 1px solid rgba(99,102,241,0.2);
-    border-radius: 20px;
-    padding: 28px 32px;
-    margin-bottom: 28px;
-    position: relative;
-    overflow: hidden;
-}
-.hero-banner::before {
-    content: '';
-    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-    background: radial-gradient(ellipse at top left, rgba(99,102,241,0.12), transparent 60%);
-    pointer-events: none;
-}
-.hero-title {
-    font-family: 'Space Grotesk', sans-serif;
-    font-size: 1.9rem; font-weight: 700;
-    background: linear-gradient(135deg, #a5b4fc, #67e8f9, #a5b4fc);
-    background-size: 200%;
-    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-    margin: 0 0 6px 0;
-}
-.hero-subtitle { color: #64748b; font-size: 0.9rem; margin: 0; }
-.hero-badge {
-    display: inline-block; padding: 4px 12px;
-    background: rgba(99,102,241,0.2); border: 1px solid rgba(99,102,241,0.4);
-    border-radius: 20px; font-size: 11px; color: #a5b4fc;
-    font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em;
-    margin-bottom: 10px;
-}
-
-/* ── Section headers ── */
-.section-hdr {
-    display: flex; align-items: center; gap: 10px;
-    color: #e2e8f0; font-size: 1rem; font-weight: 600;
-    margin: 28px 0 14px 0;
-}
-.section-hdr::before {
-    content: ''; width: 4px; height: 20px;
-    background: linear-gradient(180deg, #6366f1, #06b6d4);
-    border-radius: 2px; flex-shrink: 0;
-}
-
-/* ── Insight cards ── */
-.insight-card {
-    background: linear-gradient(135deg, rgba(30,41,59,0.9), rgba(15,23,42,0.9));
-    border: 1px solid rgba(99,102,241,0.2);
-    border-radius: 14px; padding: 18px 20px; margin: 6px 0;
-    height: 130px;
-}
-.insight-card h4 { color: #a5b4fc; font-size: 12px; font-weight: 600; margin: 0 0 6px 0; text-transform: uppercase; letter-spacing: 0.05em; }
-.insight-card p { color: #94a3b8; font-size: 12px; margin: 0; line-height: 1.5; }
-.insight-card .big-num { font-family: 'Space Grotesk', sans-serif; font-size: 1.8rem; font-weight: 700; color: #f1f5f9; }
-.insight-card .college-name { color: #6366f1; font-size: 11px; font-weight: 600; margin-top: 6px; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-/* ── Recruiter chips ── */
-.chip-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
-.chip {
-    padding: 5px 13px; border-radius: 20px; font-size: 12px; font-weight: 600;
-    border: 1px solid; cursor: default;
-}
-.chip-blue  { background: rgba(99,102,241,0.12);  color: #a5b4fc; border-color: rgba(99,102,241,0.3); }
-.chip-cyan  { background: rgba(6,182,212,0.12);   color: #67e8f9; border-color: rgba(6,182,212,0.3); }
-.chip-green { background: rgba(16,185,129,0.12);  color: #6ee7b7; border-color: rgba(16,185,129,0.3); }
-.chip-amber { background: rgba(245,158,11,0.12);  color: #fcd34d; border-color: rgba(245,158,11,0.3); }
-
-/* ── Stat pill ── */
-.stat-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; }
-.stat-pill {
-    background: rgba(30,41,59,0.8); border: 1px solid rgba(99,102,241,0.2);
-    border-radius: 24px; padding: 6px 16px;
-    font-size: 12px; color: #94a3b8; font-weight: 500;
-}
-.stat-pill span { color: #a5b4fc; font-weight: 700; }
-
-/* ── Tables ── */
-[data-testid="stDataFrame"] { border-radius: 12px; overflow: hidden; border: 1px solid rgba(99,102,241,0.15); }
-
-/* ── Tabs ── */
-.stTabs [data-baseweb="tab-list"] {
-    background: rgba(15,23,42,0.8); border-radius: 10px;
-    padding: 4px; gap: 4px;
-    border: 1px solid rgba(99,102,241,0.15);
-}
-.stTabs [data-baseweb="tab"] { color: #64748b; border-radius: 7px; font-size: 13px; }
-.stTabs [data-baseweb="tab"][aria-selected="true"] {
-    background: linear-gradient(135deg, #6366f1, #4f46e5);
-    color: white !important;
-}
-
-/* ── Footer ── */
-.footer {
-    text-align: center;
-    padding: 24px 0 12px 0;
-    color: #475569;
-    font-size: 12px;
-    border-top: 1px solid rgba(99,102,241,0.15);
-    margin-top: 40px;
-}
-.footer a { color: #6366f1; text-decoration: none; }
-.footer a:hover { color: #a5b4fc; }
-.footer .brand { color: #a5b4fc; font-weight: 600; }
-.footer .acc { color: #06b6d4; }
-
-h1,h2,h3,h4 { color: #e2e8f0; }
-p, li { color: #94a3b8; }
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    
+    html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
+    
+    .main { background: #0f172a; }
+    
+    .stApp { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); }
+    
+    /* Sidebar */
+    [data-testid="stSidebar"] {
+        background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+        border-right: 1px solid #334155;
+    }
+    [data-testid="stSidebar"] .stSelectbox label,
+    [data-testid="stSidebar"] .stMultiSelect label,
+    [data-testid="stSidebar"] .stSlider label,
+    [data-testid="stSidebar"] p,
+    [data-testid="stSidebar"] h1,
+    [data-testid="stSidebar"] h2,
+    [data-testid="stSidebar"] h3 { color: #e2e8f0 !important; }
+    
+    /* Metric cards */
+    [data-testid="metric-container"] {
+        background: linear-gradient(135deg, #1e293b, #0f172a);
+        border: 1px solid #334155;
+        border-radius: 12px;
+        padding: 16px;
+    }
+    [data-testid="metric-container"] [data-testid="stMetricLabel"] { color: #94a3b8 !important; font-size: 13px; }
+    [data-testid="metric-container"] [data-testid="stMetricValue"] { color: #f1f5f9 !important; font-size: 28px; font-weight: 700; }
+    [data-testid="metric-container"] [data-testid="stMetricDelta"] { color: #4ade80 !important; }
+    
+    /* Page title */
+    .page-title {
+        font-size: 2rem;
+        font-weight: 700;
+        background: linear-gradient(135deg, #60a5fa, #a78bfa);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin-bottom: 4px;
+    }
+    .page-subtitle { color: #64748b; font-size: 0.95rem; margin-bottom: 24px; }
+    
+    /* Section headers */
+    .section-header {
+        color: #e2e8f0;
+        font-size: 1.1rem;
+        font-weight: 600;
+        margin: 24px 0 12px 0;
+        padding-left: 12px;
+        border-left: 3px solid #6366f1;
+    }
+    
+    /* Cards */
+    .info-card {
+        background: linear-gradient(135deg, #1e293b, #0f172a);
+        border: 1px solid #334155;
+        border-radius: 12px;
+        padding: 20px;
+        margin: 8px 0;
+    }
+    
+    /* Table */
+    [data-testid="stDataFrame"] { border-radius: 10px; overflow: hidden; }
+    
+    /* Divider */
+    hr { border-color: #334155; }
+    
+    /* Tab styling */
+    .stTabs [data-baseweb="tab-list"] { background: #1e293b; border-radius: 8px; padding: 4px; gap: 4px; }
+    .stTabs [data-baseweb="tab"] { color: #94a3b8; border-radius: 6px; }
+    .stTabs [data-baseweb="tab"][aria-selected="true"] { background: #6366f1; color: white; }
+    
+    /* Streamlit selectbox / multiselect */
+    .stSelectbox > div > div, .stMultiSelect > div > div {
+        background: #1e293b;
+        border-color: #334155;
+        color: #e2e8f0;
+    }
+    
+    h1, h2, h3, h4 { color: #e2e8f0; }
+    p, li { color: #94a3b8; }
+    
+    .badge {
+        display: inline-block;
+        padding: 3px 10px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 600;
+        margin: 2px;
+    }
+    .badge-t1 { background: #1e3a5f; color: #60a5fa; border: 1px solid #2563eb; }
+    .badge-t2 { background: #1a3340; color: #34d399; border: 1px solid #059669; }
+    .badge-t3 { background: #2d1f3d; color: #a78bfa; border: 1px solid #7c3aed; }
 </style>
 """, unsafe_allow_html=True)
 
-# ══════════════════════════════════════════════════════════════════════════════
-# PLOTLY DEFAULTS
-# ══════════════════════════════════════════════════════════════════════════════
-BASE = dict(
+PLOTLY_LAYOUT = dict(
     paper_bgcolor="rgba(0,0,0,0)",
-    plot_bgcolor="rgba(6,11,24,0.6)",
-    font=dict(family="Inter", color="#94a3b8", size=12),
-    title_font=dict(color="#e2e8f0", size=14, family="Space Grotesk"),
-    legend=dict(bgcolor="rgba(15,23,42,0.8)", bordercolor="rgba(99,102,241,0.2)",
-                borderwidth=1, font=dict(color="#cbd5e1", size=11)),
-    xaxis=dict(gridcolor="rgba(30,41,59,0.8)", zerolinecolor="rgba(99,102,241,0.2)",
-               tickfont=dict(color="#64748b", size=11)),
-    yaxis=dict(gridcolor="rgba(30,41,59,0.8)", zerolinecolor="rgba(99,102,241,0.2)",
-               tickfont=dict(color="#64748b", size=11)),
-    margin=dict(l=40, r=20, t=48, b=40),
-    hoverlabel=dict(bgcolor="rgba(15,23,42,0.95)", bordercolor="rgba(99,102,241,0.4)",
-                    font=dict(color="#e2e8f0", size=12)),
+    plot_bgcolor="rgba(15,23,42,0.8)",
+    font=dict(family="Inter", color="#94a3b8"),
+    title_font=dict(color="#e2e8f0", size=16, family="Inter"),
+    legend=dict(bgcolor="rgba(30,41,59,0.8)", bordercolor="#334155", borderwidth=1, font=dict(color="#e2e8f0")),
+    xaxis=dict(gridcolor="#1e293b", zerolinecolor="#334155", tickfont=dict(color="#64748b")),
+    yaxis=dict(gridcolor="#1e293b", zerolinecolor="#334155", tickfont=dict(color="#64748b")),
+    margin=dict(l=40, r=20, t=50, b=40),
 )
 
-GRAD   = ["#6366f1","#06b6d4","#10b981","#f59e0b","#f43f5e","#8b5cf6","#ec4899","#14b8a6","#f97316","#84cc16"]
-TIER_C = {"Tier 1": "#6366f1", "Tier 2": "#06b6d4", "Tier 3": "#10b981"}
-CAT_C  = {
-    "IIT": "#6366f1", "NIT": "#06b6d4", "IIIT": "#10b981",
-    "Deemed University": "#f59e0b", "Research Institute": "#f43f5e",
-    "State University": "#8b5cf6", "Engineering College": "#ec4899", "University": "#14b8a6"
-}
+COLOR_PALETTE = ["#6366f1", "#06b6d4", "#10b981", "#f59e0b", "#f43f5e", "#8b5cf6", "#ec4899", "#14b8a6"]
+TIER_COLORS = {"Tier 1": "#6366f1", "Tier 2": "#06b6d4", "Tier 3": "#10b981"}
 
-def L(fig, **kw):
-    d = dict(BASE); d.update(kw)
-    fig.update_layout(**d)
-    return fig
-
-def section(text):
-    st.markdown(f'<div class="section-hdr">{text}</div>', unsafe_allow_html=True)
-
-def hero(title, subtitle, badge="LIVE DASHBOARD"):
-    st.markdown(f"""
-    <div class="hero-banner">
-        <div class="hero-badge">{badge}</div>
-        <p class="hero-title">{title}</p>
-        <p class="hero-subtitle">{subtitle}</p>
-    </div>""", unsafe_allow_html=True)
-
-def footer():
-    st.markdown("""
-    <div class="footer">
-        Built by <span class="brand">Koushik Garg</span> &nbsp;·&nbsp;
-        Data Analyst Intern @ <span class="acc">Analytics Career Connect (ACC)</span> &nbsp;·&nbsp;
-        <a href="https://www.linkedin.com/in/koushikgarg11" target="_blank">LinkedIn</a> &nbsp;·&nbsp;
-        <a href="https://github.com/koushikgarg11/College_Dashboard" target="_blank">GitHub</a> &nbsp;·&nbsp;
-        <a href="https://collegedashboard.streamlit.app" target="_blank">Live App</a> &nbsp;·&nbsp;
-        NexusIQ v1.1
-    </div>""", unsafe_allow_html=True)
-
-# ══════════════════════════════════════════════════════════════════════════════
-# DATA LOADING
-# ══════════════════════════════════════════════════════════════════════════════
+# ── Load Data ────────────────────────────────────────────────────────────────
 @st.cache_data
 def get_data():
     return load_data()
 
 df = get_data()
 
-# ══════════════════════════════════════════════════════════════════════════════
-# SIDEBAR
-# ══════════════════════════════════════════════════════════════════════════════
+# ── Sidebar Navigation ───────────────────────────────────────────────────────
 with st.sidebar:
-    st.markdown("""
-    <div style='text-align:center; padding: 8px 0 16px 0;'>
-        <div style='font-family:Space Grotesk; font-size:1.2rem; font-weight:700;
-            background:linear-gradient(135deg,#a5b4fc,#67e8f9);
-            -webkit-background-clip:text; -webkit-text-fill-color:transparent;'>
-            🔬 NexusIQ
-        </div>
-        <div style='font-size:11px; color:#475569; margin-top:2px;'>India's Tier 1 Engineering Intelligence Vault</div>
-    </div>""", unsafe_allow_html=True)
-
-    page = st.selectbox("📊 Dashboard", [
-        "🏠 Overview & Highlights",
-        "🏆 Tier 1 College Deep Dive",
-        "🗺️ State-wise Distribution",
-        "💼 Placement Analysis",
-        "🤝 Recruiter & Industry Network",
-        "⚖️ College Comparison Tool",
-        "💰 ROI & Value Analysis",
-    ])
-
+    st.markdown("## 🎓 College Analytics")
     st.markdown("---")
-    st.markdown("**🔍 Global Filters**")
-
-    sel_tier   = st.multiselect("Tier",          sorted(df["Tier"].dropna().unique()))
-    sel_states = st.multiselect("State",         sorted(df["State"].dropna().unique()))
-    sel_cats   = st.multiselect("Category",      sorted(df["Category"].dropna().unique()))
-    sel_own    = st.multiselect("Ownership",     sorted(df["Ownership Type"].dropna().unique()))
-    sel_naac   = st.multiselect("Accreditation", sorted(df["NAAC/NBA Status"].dropna().unique()))
-
-    st.markdown("---")
-    pkg_min = int(df["Avg Pkg (LPA)"].min())
-    pkg_max = int(df["Avg Pkg (LPA)"].max())
-    pkg_range = st.slider("Avg Package (LPA)", pkg_min, pkg_max, (pkg_min, pkg_max))
-
-    pl_min = int(df["Placement %"].min())
-    pl_max = int(df["Placement %"].max())
-    pl_range = st.slider("Placement %", pl_min, pl_max, (pl_min, pl_max))
-
-    st.markdown("---")
-    st.markdown(f"""
-    <div style='text-align:center;'>
-        <div style='font-size:11px; color:#475569;'>Showing data for</div>
-        <div style='font-family:Space Grotesk; font-size:1.5rem; font-weight:700; color:#a5b4fc;'>{len(df)}</div>
-        <div style='font-size:11px; color:#475569;'>colleges across {df['State'].nunique()} states</div>
-    </div>""", unsafe_allow_html=True)
-
-# ── Apply filters ─────────────────────────────────────────────────────────────
-fdf = df.copy()
-if sel_tier:   fdf = fdf[fdf["Tier"].isin(sel_tier)]
-if sel_states: fdf = fdf[fdf["State"].isin(sel_states)]
-if sel_cats:   fdf = fdf[fdf["Category"].isin(sel_cats)]
-if sel_own:    fdf = fdf[fdf["Ownership Type"].isin(sel_own)]
-if sel_naac:   fdf = fdf[fdf["NAAC/NBA Status"].isin(sel_naac)]
-fdf = fdf[(fdf["Avg Pkg (LPA)"] >= pkg_range[0]) & (fdf["Avg Pkg (LPA)"] <= pkg_range[1])]
-fdf = fdf[(fdf["Placement %"] >= pl_range[0])    & (fdf["Placement %"] <= pl_range[1])]
-
-if len(fdf) == 0:
-    st.warning("⚠️ No colleges match your current filters. Please adjust the sidebar filters.")
-    st.stop()
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# PAGE 0 — OVERVIEW & HIGHLIGHTS
-# ══════════════════════════════════════════════════════════════════════════════
-if page == "🏠 Overview & Highlights":
-    hero(
-        "NexusIQ — India's Tier 1 Engineering Intelligence Vault",
-        "The definitive database of India's premier engineering colleges — placements, packages, recruiters & ROI, all in one place",
-        "TIER 1 ENGINEERING DATABASE"
+    
+    page = st.selectbox(
+        "Navigate to Dashboard",
+        [
+            "🏆 Tier 1 College Dashboard",
+            "🗺️ State-wise Distribution",
+            "💼 Placement Analysis",
+            "🤝 Recruiter Analytics",
+            "⚖️ College Comparison",
+            "💰 ROI Analysis"
+        ]
     )
+    
+    st.markdown("---")
+    st.markdown("### Filters")
+    
+    selected_states = st.multiselect(
+        "States", sorted(df["State"].dropna().unique()), default=[]
+    )
+    selected_categories = st.multiselect(
+        "College Category", sorted(df["Category"].dropna().unique()), default=[]
+    )
+    selected_ownership = st.multiselect(
+        "Ownership Type", sorted(df["Ownership Type"].dropna().unique()), default=[]
+    )
+    
+    st.markdown("---")
+    st.caption("📊 Data: 45 Tier 1-3 Colleges")
+    st.caption("🇮🇳 Covering 18 States")
 
-    all_rec = [r for lst in fdf["Recruiter List"] for r in lst]
-    c1, c2, c3, c4, c5, c6 = st.columns(6)
-    c1.metric("Colleges",          len(fdf))
-    c2.metric("States",            fdf["State"].nunique())
-    c3.metric("Avg Placement",     f"{fdf['Placement %'].mean():.1f}%")
-    c4.metric("Avg Package",       f"₹{fdf['Avg Pkg (LPA)'].mean():.1f} LPA")
-    c5.metric("Top Package",       f"₹{fdf['Highest Pkg (LPA)'].max():.0f} LPA")
-    c6.metric("Unique Recruiters", len(set(all_rec)))
-
-    # ── Row 1: Tier & Category ──
-    section("Tier & Category Breakdown")
-    c1, c2, c3 = st.columns([1.2, 1.2, 1])
-
-    with c1:
-        tier_df = fdf.groupby("Tier").agg(
-            Count=("College Name", "count"),
-            Avg_P=("Placement %", "mean"),
-            Avg_K=("Avg Pkg (LPA)", "mean")
-        ).reset_index()
-        fig = go.Figure()
-        for _, row in tier_df.iterrows():
-            fig.add_trace(go.Bar(
-                name=row["Tier"], x=[row["Tier"]], y=[row["Count"]],
-                marker=dict(color=TIER_C[row["Tier"]], opacity=0.85,
-                            line=dict(color=TIER_C[row["Tier"]], width=1)),
-                text=[f"{int(row['Count'])} colleges"], textposition="outside",
-                textfont=dict(color="#e2e8f0"),
-                hovertemplate=(f"<b>{row['Tier']}</b><br>Colleges: {int(row['Count'])}<br>"
-                               f"Avg Placement: {row['Avg_P']:.1f}%<br>"
-                               f"Avg Package: ₹{row['Avg_K']:.1f} LPA<extra></extra>")
-            ))
-        fig.update_layout(**BASE, title="Colleges by Tier", showlegend=False)
-        fig.update_yaxes(title_text="Count")
-        st.plotly_chart(fig, use_container_width=True)
-
-    with c2:
-        cat_df = fdf.groupby("Category").size().reset_index(name="Count").sort_values("Count", ascending=False)
-        fig2 = px.bar(cat_df, x="Category", y="Count",
-                      color="Category", color_discrete_map=CAT_C,
-                      title="Colleges by Category", text="Count")
-        fig2.update_traces(textposition="outside", textfont_color="#e2e8f0")
-        fig2.update_xaxes(tickangle=35, tickfont=dict(size=10))
-        st.plotly_chart(L(fig2, showlegend=False), use_container_width=True)
-
-    with c3:
-        naac_df = fdf.groupby("NAAC/NBA Status").size().reset_index(name="Count")
-        fig3 = px.pie(naac_df, names="NAAC/NBA Status", values="Count",
-                      color_discrete_sequence=GRAD, title="Accreditation Split", hole=0.45)
-        fig3.update_traces(textfont_color="#e2e8f0", textfont_size=11)
-        fig3.update_layout(**BASE, legend=dict(font=dict(size=11), bgcolor="rgba(15,23,42,0.8)"))
-        st.plotly_chart(fig3, use_container_width=True)
-
-    # ── Row 2: Placement & Package ──
-    section("Placement & Package Landscape")
-    c1, c2 = st.columns(2)
-
-    with c1:
-        fig4 = px.scatter(
-            fdf, x="Avg Pkg (LPA)", y="Placement %",
-            color="Tier", size="Student Intake",
-            hover_name="College Name",
-            color_discrete_map=TIER_C, size_max=30,
-            title="Placement % vs Avg Package (bubble = student intake)"
-        )
-        fig4.update_traces(marker=dict(opacity=0.8, line=dict(width=1, color="rgba(255,255,255,0.2)")))
-        st.plotly_chart(L(fig4), use_container_width=True)
-
-    with c2:
-        pivot = fdf.groupby(["State", "Tier"]).agg(Avg_Pkg=("Avg Pkg (LPA)", "mean")).reset_index()
-        pivot_wide = pivot.pivot(index="State", columns="Tier", values="Avg_Pkg").fillna(0)
-        fig5 = go.Figure(go.Heatmap(
-            z=pivot_wide.values,
-            x=pivot_wide.columns.tolist(),
-            y=pivot_wide.index.tolist(),
-            colorscale=[[0, "#060b18"], [0.5, "#312e81"], [1, "#a5b4fc"]],
-            hoverongaps=False,
-            text=[[f"₹{v:.1f}" if v else "" for v in row] for row in pivot_wide.values],
-            texttemplate="%{text}",
-            textfont=dict(size=11, color="#e2e8f0"),
-            showscale=True,
-            colorbar=dict(tickfont=dict(color="#64748b"))
-        ))
-        fig5.update_layout(**BASE, title="Avg Package (LPA) — State × Tier Heatmap")
-        fig5.update_xaxes(title_text="", tickfont=dict(size=12))
-        fig5.update_yaxes(title_text="", tickfont=dict(size=11))
-        st.plotly_chart(fig5, use_container_width=True)
-
-    # ── Row 3: Quick Insights ──
-    section("🔥 Quick Insights")
-    top_place = fdf.nlargest(1, "Placement %").iloc[0]
-    top_pkg   = fdf.nlargest(1, "Avg Pkg (LPA)").iloc[0]
-    top_roi   = fdf.nlargest(1, "ROI Score").iloc[0]
-    top_nirf  = fdf.dropna(subset=["NIRF Rank"]).nsmallest(1, "NIRF Rank").iloc[0]
-
-    c1, c2, c3, c4 = st.columns(4)
-    cards = [
-        (c1, "🎯 Best Placement",  top_place["College Name"], f"{top_place['Placement %']:.0f}%",          "placement rate"),
-        (c2, "💰 Highest Package", top_pkg["College Name"],   f"₹{top_pkg['Avg Pkg (LPA)']:.0f} LPA",     "average package"),
-        (c3, "📈 Best ROI",        top_roi["College Name"],   f"{top_roi['ROI Score']:.1f}",               "ROI score"),
-        (c4, "🏅 Top NIRF Rank",   top_nirf["College Name"],  f"#{int(top_nirf['NIRF Rank'])}",            "national rank"),
-    ]
-    for col, title, name, val, lbl in cards:
-        with col:
-            st.markdown(f"""
-            <div class="insight-card">
-                <h4>{title}</h4>
-                <div class="big-num">{val}</div>
-                <p style="margin-top:4px;">{lbl}</p>
-                <span class="college-name">{name}</span>
-            </div>""", unsafe_allow_html=True)
-
-    footer()
+# ── Filter data ──────────────────────────────────────────────────────────────
+filtered_df = df.copy()
+if selected_states:
+    filtered_df = filtered_df[filtered_df["State"].isin(selected_states)]
+if selected_categories:
+    filtered_df = filtered_df[filtered_df["Category"].isin(selected_categories)]
+if selected_ownership:
+    filtered_df = filtered_df[filtered_df["Ownership Type"].isin(selected_ownership)]
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# PAGE 1 — TIER 1 COLLEGE DEEP DIVE
-# ══════════════════════════════════════════════════════════════════════════════
-elif page == "🏆 Tier 1 College Deep Dive":
-    hero("Tier 1 College Deep Dive",
-         "IITs, IISc & top research institutions — premium analytics on India's best colleges",
-         "TIER 1 ANALYSIS")
+# ═══════════════════════════════════════════════════════════════════════════
+#  PAGE 1 – TIER 1 COLLEGE DASHBOARD
+# ═══════════════════════════════════════════════════════════════════════════
+if page == "🏆 Tier 1 College Dashboard":
+    st.markdown('<p class="page-title">🏆 Tier 1 College Dashboard</p>', unsafe_allow_html=True)
+    st.markdown('<p class="page-subtitle">Deep analysis of India\'s premier educational institutions</p>', unsafe_allow_html=True)
 
-    t1 = fdf[fdf["Tier"] == "Tier 1"].copy()
-    if len(t1) == 0:
-        st.info("No Tier 1 colleges match the current filters.")
-        st.stop()
+    t1 = filtered_df[filtered_df["Tier"] == "Tier 1"]
 
-    c1, c2, c3, c4, c5 = st.columns(5)
-    c1.metric("Tier 1 Colleges",  len(t1))
-    c2.metric("Avg Placement %",  f"{t1['Placement %'].mean():.1f}%")
-    c3.metric("Avg Package",      f"₹{t1['Avg Pkg (LPA)'].mean():.1f} LPA")
-    c4.metric("Best Package",     f"₹{t1['Highest Pkg (LPA)'].max():.0f} LPA")
-    c5.metric("Avg NIRF Rank",    f"#{t1['NIRF Rank'].mean():.0f}")
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("Tier 1 Colleges", len(t1))
+    col2.metric("Avg Placement %", f"{t1['Placement %'].mean():.1f}%" if len(t1) else "N/A")
+    col3.metric("Avg Package (LPA)", f"₹{t1['Avg Pkg (LPA)'].mean():.1f}" if len(t1) else "N/A")
+    col4.metric("Avg NIRF Rank", f"{t1['NIRF Rank'].mean():.1f}" if len(t1) else "N/A")
 
-    tabs = st.tabs(["📊 Performance", "📍 Geography", "🎓 Academics", "📋 Full Data"])
-
-    # Tab 0: Performance
-    with tabs[0]:
-        section("NIRF Rank vs Package vs Placement")
-        fig = px.scatter(
-            t1, x="NIRF Rank", y="Placement %",
-            size="Avg Pkg (LPA)", color="Category",
-            hover_name="College Name", color_discrete_map=CAT_C, size_max=35,
-            title="NIRF Rank vs Placement % (bubble = Avg Package)"
-        )
-        fig.update_traces(marker=dict(opacity=0.85, line=dict(width=1, color="rgba(255,255,255,0.15)")))
-        st.plotly_chart(L(fig), use_container_width=True)
-
-        c1, c2 = st.columns(2)
-        with c1:
-            # FIX: horizontal bar chart — college names readable on Y-axis
-            sorted_t1 = t1.sort_values("Avg Pkg (LPA)", ascending=False).head(16)
-            fig2 = go.Figure()
-            fig2.add_trace(go.Bar(
-                name="Avg Pkg (LPA)", y=sorted_t1["College Name"],
-                x=sorted_t1["Avg Pkg (LPA)"], orientation="h",
-                marker_color="#6366f1", opacity=0.85,
-                text=sorted_t1["Avg Pkg (LPA)"].apply(lambda x: f"₹{x:.1f}"),
-                textposition="outside", textfont=dict(color="#e2e8f0", size=10)
-            ))
-            fig2.add_trace(go.Bar(
-                name="Highest Pkg (LPA)", y=sorted_t1["College Name"],
-                x=sorted_t1["Highest Pkg (LPA)"], orientation="h",
-                marker_color="#06b6d4", opacity=0.85,
-                text=sorted_t1["Highest Pkg (LPA)"].apply(lambda x: f"₹{x:.0f}"),
-                textposition="outside", textfont=dict(color="#e2e8f0", size=10)
-            ))
-            fig2.update_layout(**BASE, title="Avg vs Highest Package (LPA)",
-                               barmode="group",
-                               yaxis=dict(tickfont=dict(size=10), gridcolor="rgba(30,41,59,0.8)"),
-                               height=420)
+    st.markdown('<p class="section-header">Placement % vs Average Package</p>', unsafe_allow_html=True)
+    
+    if len(t1) > 0:
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            fig = px.scatter(
+                t1, x="Avg Pkg (LPA)", y="Placement %",
+                size="Student Intake", color="Category",
+                hover_name="College Name",
+                color_discrete_sequence=COLOR_PALETTE,
+                title="Package vs Placement (bubble = student intake)",
+                labels={"Avg Pkg (LPA)": "Avg Package (LPA)", "Placement %": "Placement %"}
+            )
+            fig.update_layout(**PLOTLY_LAYOUT)
+            st.plotly_chart(fig, use_container_width=True)
+        
+        with col2:
+            fig2 = px.bar(
+                t1.sort_values("NIRF Rank").head(15),
+                x="College Name", y="Placement %",
+                color="Category", color_discrete_sequence=COLOR_PALETTE,
+                title="Placement % – Top Tier 1 Colleges"
+            )
+            fig2.update_layout(**PLOTLY_LAYOUT)
+            fig2.update_xaxes(tickangle=45)
             st.plotly_chart(fig2, use_container_width=True)
 
-        with c2:
-            sorted_place = t1.sort_values("Placement %", ascending=True)
-            fig3 = px.bar(
-                sorted_place, x="Placement %", y="College Name", orientation="h",
-                color="Category", color_discrete_map=CAT_C, title="Placement % Ranking",
-                text="Placement %"
+        st.markdown('<p class="section-header">NIRF Rankings & Package Distribution</p>', unsafe_allow_html=True)
+        col3, col4 = st.columns(2)
+
+        with col3:
+            fig3 = px.scatter(
+                t1.dropna(subset=["NIRF Rank", "Avg Pkg (LPA)"]),
+                x="NIRF Rank", y="Avg Pkg (LPA)",
+                color="Category", hover_name="College Name",
+                color_discrete_sequence=COLOR_PALETTE,
+                title="NIRF Rank vs Avg Package (lower rank = better)",
+                trendline="lowess"
             )
-            fig3.update_traces(texttemplate="%{text}%", textposition="outside",
-                               textfont=dict(color="#e2e8f0", size=10))
-            fig3.update_yaxes(tickfont=dict(size=10))
-            fig3.update_layout(**BASE, height=420)
+            fig3.update_layout(**PLOTLY_LAYOUT)
             st.plotly_chart(fig3, use_container_width=True)
 
-    # Tab 1: Geography
-    with tabs[1]:
-        section("Geographic Distribution")
-        c1, c2 = st.columns(2)
-        with c1:
-            state_t1 = t1.groupby("State").agg(
-                Count=("College Name", "count"),
-                Avg_Pkg=("Avg Pkg (LPA)", "mean")
-            ).reset_index()
-            fig4 = px.bar(state_t1.sort_values("Count", ascending=True),
-                          x="Count", y="State", orientation="h",
-                          color="Avg_Pkg", color_continuous_scale="Viridis",
-                          title="Tier 1 Colleges per State", text="Count")
-            fig4.update_traces(textposition="outside", textfont_color="#e2e8f0")
-            fig4.update_yaxes(tickfont=dict(size=11))
-            st.plotly_chart(L(fig4), use_container_width=True)
+        with col4:
+            fig4 = px.pie(
+                t1, names="Category",
+                color_discrete_sequence=COLOR_PALETTE,
+                title="Category Breakdown – Tier 1"
+            )
+            fig4.update_layout(**PLOTLY_LAYOUT)
+            st.plotly_chart(fig4, use_container_width=True)
 
-        with c2:
-            loc_df = t1.groupby("Location Type").agg(
-                Count=("College Name", "count"),
-                Avg_Place=("Placement %", "mean")
-            ).reset_index()
-            fig5 = px.pie(loc_df, names="Location Type", values="Count",
-                          color_discrete_sequence=GRAD, hole=0.4,
-                          title="Urban vs Semi-Urban Distribution")
-            fig5.update_traces(textfont_color="#e2e8f0", textfont_size=12)
-            st.plotly_chart(L(fig5), use_container_width=True)
-
-    # Tab 2: Academics
-    with tabs[2]:
-        section("Alumni Network & Student Intake")
-        c1, c2 = st.columns(2)
-        with c1:
-            alumni_df = t1.dropna(subset=["Alumni Count"]).sort_values("Alumni Count", ascending=True)
-            fig6 = px.bar(alumni_df, x="Alumni Count", y="College Name", orientation="h",
-                          color="Alumni Count", color_continuous_scale="Purples",
-                          title="Alumni Network Size")
-            fig6.update_yaxes(tickfont=dict(size=10))
-            st.plotly_chart(L(fig6), use_container_width=True)
-
-        with c2:
-            fig7 = px.scatter(t1, x="Student Intake", y="Placement %",
-                              color="Category", hover_name="College Name",
-                              color_discrete_map=CAT_C, size="Avg Pkg (LPA)", size_max=28,
-                              title="Student Intake vs Placement %")
-            st.plotly_chart(L(fig7), use_container_width=True)
-
-        section("Accreditation Distribution")
-        naac_t1 = t1.groupby("NAAC/NBA Status").size().reset_index(name="Count")
-        fig8 = px.bar(naac_t1, x="NAAC/NBA Status", y="Count",
-                      color="NAAC/NBA Status", color_discrete_sequence=GRAD,
-                      title="NAAC/NBA Accreditation – Tier 1 Colleges", text="Count")
-        fig8.update_traces(textposition="outside", textfont_color="#e2e8f0")
-        st.plotly_chart(L(fig8, showlegend=False), use_container_width=True)
-
-    # Tab 3: Full Data
-    with tabs[3]:
-        section("Complete Tier 1 Dataset")
-        cols = ["College Name", "Category", "State", "City", "NIRF Rank", "NAAC/NBA Status",
-                "Ownership Type", "Placement %", "Avg Pkg (LPA)", "Highest Pkg (LPA)",
-                "Student Intake", "ROI Score"]
+        st.markdown('<p class="section-header">Tier 1 College Details</p>', unsafe_allow_html=True)
+        display_cols = ["College Name", "Category", "State", "NIRF Rank", "NAAC/NBA Status",
+                        "Placement %", "Avg Pkg", "Highest Pkg", "Student Intake"]
         st.dataframe(
-            t1[cols].sort_values("NIRF Rank").reset_index(drop=True),
-            use_container_width=True, height=500
+            t1[display_cols].sort_values("NIRF Rank").reset_index(drop=True),
+            use_container_width=True,
+            height=400
         )
+    else:
+        st.info("No Tier 1 colleges match current filters.")
 
-    footer()
 
-
-# ══════════════════════════════════════════════════════════════════════════════
-# PAGE 2 — STATE-WISE DISTRIBUTION
-# ══════════════════════════════════════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════════════
+#  PAGE 2 – STATE-WISE DISTRIBUTION
+# ═══════════════════════════════════════════════════════════════════════════
 elif page == "🗺️ State-wise Distribution":
-    hero("State-wise College Distribution",
-         "Geographic intelligence — how top colleges are distributed across India's states",
-         "GEO ANALYTICS")
+    st.markdown('<p class="page-title">🗺️ State-wise College Distribution</p>', unsafe_allow_html=True)
+    st.markdown('<p class="page-subtitle">Geographic spread of top colleges across India</p>', unsafe_allow_html=True)
 
-    ss = fdf.groupby("State").agg(
-        Count=("College Name", "count"),
-        Avg_Placement=("Placement %", "mean"),
-        Avg_Package=("Avg Pkg (LPA)", "mean"),
-        Total_Intake=("Student Intake", "sum"),
-        Tier1=("Tier", lambda x: (x == "Tier 1").sum()),
-        Tier2=("Tier", lambda x: (x == "Tier 2").sum()),
-        Tier3=("Tier", lambda x: (x == "Tier 3").sum()),
-    ).reset_index().round(2)
-
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("States",               len(ss))
-    c2.metric("Total Colleges",        len(fdf))
-    c3.metric("Best Placement State",  ss.loc[ss["Avg_Placement"].idxmax(), "State"])
-    c4.metric("Best Package State",    ss.loc[ss["Avg_Package"].idxmax(), "State"])
-
-    tabs = st.tabs(["📊 Distribution", "💰 Package Map", "🎯 Placement Map", "📋 State Table"])
-
-    with tabs[0]:
-        section("College Count & Tier Mix by State")
-        tier_state = fdf.groupby(["State", "Tier"]).size().reset_index(name="Count")
-        fig = px.bar(tier_state.sort_values("Count", ascending=False),
-                     x="State", y="Count", color="Tier",
-                     color_discrete_map=TIER_C,
-                     title="Stacked Tier Distribution by State")
-        fig.update_xaxes(tickangle=45, tickfont=dict(size=10))
-        st.plotly_chart(L(fig), use_container_width=True)
-
-        c1, c2 = st.columns(2)
-        with c1:
-            fig2 = px.bar(ss.sort_values("Count", ascending=True),
-                          x="Count", y="State", orientation="h",
-                          color="Count", color_continuous_scale="Blues",
-                          title="Number of Colleges per State", text="Count")
-            fig2.update_traces(textposition="outside", textfont_color="#e2e8f0")
-            # FIX: ensure Y-axis state labels are readable
-            fig2.update_yaxes(tickfont=dict(size=11))
-            st.plotly_chart(L(fig2), use_container_width=True)
-
-        with c2:
-            # FIX: simplify categories to reduce color noise
-            cat_state = fdf.copy()
-            cat_state["Cat_Simple"] = cat_state["Category"].replace({
-                "Engineering College": "University / College",
-                "State University": "University / College",
-                "University": "University / College"
-            })
-            cat_state_grp = cat_state.groupby(["State", "Cat_Simple"]).size().reset_index(name="Count")
-            fig3 = px.bar(cat_state_grp, x="State", y="Count", color="Cat_Simple",
-                          color_discrete_sequence=GRAD,
-                          title="Category Mix by State (simplified)")
-            fig3.update_xaxes(tickangle=45, tickfont=dict(size=10))
-            st.plotly_chart(L(fig3), use_container_width=True)
-
-    with tabs[1]:
-        section("Average Package by State")
-        fig4 = px.bar(ss.sort_values("Avg_Package", ascending=False),
-                      x="State", y="Avg_Package",
-                      color="Avg_Package", color_continuous_scale="Viridis",
-                      title="Average Package (LPA) — State Ranking",
-                      text=ss.sort_values("Avg_Package", ascending=False)["Avg_Package"]
-                             .apply(lambda x: f"₹{x:.1f}"))
-        fig4.update_traces(textposition="outside", textfont_color="#e2e8f0")
-        fig4.update_xaxes(tickangle=45, tickfont=dict(size=10))
-        st.plotly_chart(L(fig4), use_container_width=True)
-
-        fig5 = px.scatter(ss, x="Avg_Package", y="Count",
-                          size="Total_Intake", text="State",
-                          color="Avg_Placement", color_continuous_scale="Plasma",
-                          title="Package vs College Count (bubble = total intake, color = avg placement)")
-        fig5.update_traces(textposition="top center", textfont=dict(color="#e2e8f0", size=10),
-                           marker=dict(opacity=0.85))
-        st.plotly_chart(L(fig5), use_container_width=True)
-
-    with tabs[2]:
-        section("Placement Performance by State")
-        fig6 = px.bar(ss.sort_values("Avg_Placement", ascending=True),
-                      x="Avg_Placement", y="State", orientation="h",
-                      color="Avg_Placement", color_continuous_scale="Teal",
-                      title="Average Placement % by State",
-                      text=ss.sort_values("Avg_Placement")["Avg_Placement"]
-                             .apply(lambda x: f"{x:.1f}%"))
-        fig6.update_traces(textposition="outside", textfont_color="#e2e8f0")
-        fig6.update_yaxes(tickfont=dict(size=11))
-        st.plotly_chart(L(fig6), use_container_width=True)
-
-    with tabs[3]:
-        section("State-wise Summary")
-        ss_display = ss.copy()
-        ss_display.columns = ["State", "Colleges", "Avg Placement (%)", "Avg Package (LPA)",
-                               "Total Intake", "Tier 1", "Tier 2", "Tier 3"]
-        st.dataframe(ss_display.sort_values("Colleges", ascending=False).reset_index(drop=True),
-                     use_container_width=True)
-
-    footer()
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# PAGE 3 — PLACEMENT ANALYSIS
-# ══════════════════════════════════════════════════════════════════════════════
-elif page == "💼 Placement Analysis":
-    hero("Placement Analysis Dashboard",
-         "Deep dive into placement rates, salary packages & employment trends across colleges",
-         "PLACEMENT INTELLIGENCE")
-
-    c1, c2, c3, c4, c5 = st.columns(5)
-    c1.metric("Avg Placement %",       f"{fdf['Placement %'].mean():.1f}%")
-    c2.metric("100% Placed Colleges",  len(fdf[fdf["Placement %"] == 100]))
-    c3.metric("Avg Package",           f"₹{fdf['Avg Pkg (LPA)'].mean():.1f} LPA")
-    c4.metric("Max Package",           f"₹{fdf['Highest Pkg (LPA)'].max():.0f} LPA")
-    c5.metric("Median Package",        f"₹{fdf['Avg Pkg (LPA)'].median():.1f} LPA")
-
-    tabs = st.tabs(["📈 Distributions", "🏆 Rankings", "📊 Comparisons", "🔗 Correlations"])
-
-    with tabs[0]:
-        section("Placement % & Package Distributions")
-        c1, c2 = st.columns(2)
-        with c1:
-            fig = px.histogram(fdf, x="Placement %", nbins=10,
-                               color="Tier", color_discrete_map=TIER_C,
-                               barmode="overlay", opacity=0.75,
-                               title="Placement % Distribution by Tier", marginal="rug")
-            st.plotly_chart(L(fig), use_container_width=True)
-        with c2:
-            fig2 = px.histogram(fdf.dropna(subset=["Avg Pkg (LPA)"]),
-                                x="Avg Pkg (LPA)", nbins=12,
-                                color="Category", color_discrete_map=CAT_C,
-                                barmode="overlay", opacity=0.75,
-                                title="Avg Package Distribution by Category", marginal="box")
-            st.plotly_chart(L(fig2), use_container_width=True)
-
-        section("Package Range — Box Plots")
-        c1, c2 = st.columns(2)
-        with c1:
-            fig3 = px.box(fdf.dropna(subset=["Avg Pkg (LPA)"]),
-                          x="Tier", y="Avg Pkg (LPA)",
-                          color="Tier", color_discrete_map=TIER_C,
-                          points="all", hover_name="College Name",
-                          title="Avg Package Distribution by Tier")
-            st.plotly_chart(L(fig3), use_container_width=True)
-        with c2:
-            fig4 = px.box(fdf.dropna(subset=["Avg Pkg (LPA)"]),
-                          x="Category", y="Avg Pkg (LPA)",
-                          color="Category", color_discrete_map=CAT_C,
-                          points="all", hover_name="College Name",
-                          title="Avg Package Distribution by Category")
-            fig4.update_xaxes(tickangle=30, tickfont=dict(size=10))
-            st.plotly_chart(L(fig4), use_container_width=True)
-
-    with tabs[1]:
-        section("Top 20 Colleges by Placement %")
-        top20p = fdf.nlargest(20, "Placement %")
-        fig5 = px.bar(top20p.sort_values("Placement %"),
-                      x="Placement %", y="College Name", orientation="h",
-                      color="Tier", color_discrete_map=TIER_C,
-                      text="Placement %", title="Top 20 Colleges — Placement %")
-        fig5.update_traces(texttemplate="%{text}%", textposition="outside",
-                           textfont_color="#e2e8f0")
-        fig5.update_yaxes(tickfont=dict(size=10))
-        st.plotly_chart(L(fig5), use_container_width=True)
-
-        section("Top 20 Colleges by Average Package")
-        top20k = fdf.nlargest(20, "Avg Pkg (LPA)")
-        fig6 = px.bar(top20k.sort_values("Avg Pkg (LPA)"),
-                      x="Avg Pkg (LPA)", y="College Name", orientation="h",
-                      color="Category", color_discrete_map=CAT_C,
-                      text="Avg Pkg (LPA)", title="Top 20 Colleges — Avg Package (LPA)")
-        fig6.update_traces(texttemplate="₹%{text}", textposition="outside",
-                           textfont_color="#e2e8f0")
-        fig6.update_yaxes(tickfont=dict(size=10))
-        st.plotly_chart(L(fig6), use_container_width=True)
-
-    with tabs[2]:
-        section("Tier & Ownership Comparisons")
-        c1, c2 = st.columns(2)
-        with c1:
-            tier_agg = fdf.groupby("Tier").agg(
-                Avg_P=("Placement %", "mean"),
-                Avg_K=("Avg Pkg (LPA)", "mean"),
-            ).reset_index()
-            fig7 = go.Figure()
-            fig7.add_trace(go.Bar(
-                name="Avg Placement %", x=tier_agg["Tier"], y=tier_agg["Avg_P"].round(1),
-                marker_color="#6366f1", yaxis="y",
-                text=tier_agg["Avg_P"].round(1), texttemplate="%{text}%",
-                textposition="outside", textfont=dict(color="#e2e8f0")
-            ))
-            fig7.add_trace(go.Bar(
-                name="Avg Package (LPA)", x=tier_agg["Tier"], y=tier_agg["Avg_K"].round(1),
-                marker_color="#06b6d4", yaxis="y2",
-                text=tier_agg["Avg_K"].round(1), texttemplate="₹%{text}",
-                textposition="outside", textfont=dict(color="#e2e8f0")
-            ))
-            fig7.update_layout(**BASE, title="Tier: Placement % vs Package", barmode="group",
-                               yaxis2=dict(title="Package (LPA)", overlaying="y", side="right",
-                                           tickfont=dict(color="#475569")))
-            st.plotly_chart(fig7, use_container_width=True)
-
-        with c2:
-            own_agg = fdf.groupby("Ownership Type").agg(
-                Avg_P=("Placement %", "mean"),
-                Avg_K=("Avg Pkg (LPA)", "mean"),
-                Count=("College Name", "count")
-            ).reset_index()
-            fig8 = px.scatter(own_agg, x="Avg_K", y="Avg_P",
-                              size="Count", color="Ownership Type",
-                              color_discrete_sequence=GRAD, text="Ownership Type",
-                              title="Ownership Type: Package vs Placement")
-            fig8.update_traces(textposition="top center", textfont=dict(color="#e2e8f0", size=10))
-            st.plotly_chart(L(fig8), use_container_width=True)
-
-    with tabs[3]:
-        section("Correlation: What drives placement?")
-        corr_df = fdf[["Placement %", "Avg Pkg (LPA)", "Highest Pkg (LPA)",
-                        "Student Intake", "NIRF Rank", "Recruiter Count",
-                        "Partner Count", "Alumni Count"]].dropna()
-        corr = corr_df.corr().round(2)
-        fig9 = go.Figure(go.Heatmap(
-            z=corr.values, x=corr.columns, y=corr.index,
-            colorscale=[[0, "#f43f5e"], [0.5, "#060b18"], [1, "#6366f1"]],
-            zmid=0, text=corr.values,
-            texttemplate="%{text}", textfont=dict(size=11, color="#e2e8f0"),
-            showscale=True, colorbar=dict(tickfont=dict(color="#64748b"))
-        ))
-        fig9.update_layout(**BASE, title="Correlation Matrix — Key Metrics")
-        fig9.update_xaxes(tickangle=30, tickfont=dict(size=11))
-        fig9.update_yaxes(tickfont=dict(size=11))
-        st.plotly_chart(fig9, use_container_width=True)
-
-    footer()
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# PAGE 4 — RECRUITER & INDUSTRY NETWORK
-# ══════════════════════════════════════════════════════════════════════════════
-elif page == "🤝 Recruiter & Industry Network":
-    hero("Recruiter & Industry Network",
-         "Who's hiring from India's top colleges — recruiter frequency, reach & hiring patterns",
-         "RECRUITER INTELLIGENCE")
-
-    all_rec  = [r for lst in fdf["Recruiter List"] for r in lst]
-    all_part = [r for lst in fdf["Partner List"]   for r in lst]
-    rec_ctr  = Counter(all_rec)
-    part_ctr = Counter(all_part)
-    top_rec  = pd.DataFrame(rec_ctr.most_common(25),  columns=["Company", "Colleges"])
-    top_part = pd.DataFrame(part_ctr.most_common(25), columns=["Company", "Colleges"])
-
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Unique Recruiters",       len(rec_ctr))
-    c2.metric("Unique Industry Partners", len(part_ctr))
-    c3.metric("Top Recruiter",           rec_ctr.most_common(1)[0][0])
-    c4.metric("Avg Recruiters/College",  f"{fdf['Recruiter Count'].mean():.1f}")
-
-    tabs = st.tabs(["🏢 Top Recruiters", "🤝 Industry Partners", "📊 Network Analysis", "🔬 Internships"])
-
-    with tabs[0]:
-        section("Top 25 Recruiters by College Reach")
-        fig = px.bar(top_rec.sort_values("Colleges"),
-                     x="Colleges", y="Company", orientation="h",
-                     color="Colleges", color_continuous_scale="Viridis",
-                     title="Top 25 Recruiters (number of colleges they recruit from)",
-                     text="Colleges")
-        fig.update_traces(textposition="outside", textfont_color="#e2e8f0")
-        fig.update_yaxes(tickfont=dict(size=11))
-        st.plotly_chart(L(fig), use_container_width=True)
-
-        # FIX: chips + recruiter depth bar to fill the empty space
-        section("🔥 Top 15 Most Active Recruiters")
-        chip_colors = ["chip-blue", "chip-cyan", "chip-green", "chip-amber"]
-        chips = "".join([
-            f'<span class="chip {chip_colors[i % 4]}">{r} <b>({c})</b></span>'
-            for i, (r, c) in enumerate(rec_ctr.most_common(15))
-        ])
-        st.markdown(f'<div class="chip-grid">{chips}</div>', unsafe_allow_html=True)
-
-        st.markdown("<br>", unsafe_allow_html=True)
-        section("Recruiter Depth per College")
-        fig_depth = px.bar(
-            fdf.sort_values("Recruiter Count", ascending=False).head(20),
-            x="Recruiter Count", y="College Name", orientation="h",
-            color="Tier", color_discrete_map=TIER_C,
-            title="Top 20 Colleges — Number of Active Recruiters",
-            text="Recruiter Count"
+    state_stats = (
+        filtered_df.groupby("State")
+        .agg(
+            College_Count=("College Name", "count"),
+            Avg_Placement=("Placement %", "mean"),
+            Avg_Package=("Avg Pkg (LPA)", "mean"),
+            Total_Intake=("Student Intake", "sum")
         )
-        fig_depth.update_traces(textposition="outside", textfont_color="#e2e8f0")
-        fig_depth.update_yaxes(tickfont=dict(size=11))
-        st.plotly_chart(L(fig_depth), use_container_width=True)
-
-    with tabs[1]:
-        section("Top 25 Industry Partners")
-        fig2 = px.bar(top_part.sort_values("Colleges"),
-                      x="Colleges", y="Company", orientation="h",
-                      color="Colleges", color_continuous_scale="Plasma",
-                      title="Top 25 Industry Partners", text="Colleges")
-        fig2.update_traces(textposition="outside", textfont_color="#e2e8f0")
-        fig2.update_yaxes(tickfont=dict(size=11))
-        st.plotly_chart(L(fig2), use_container_width=True)
-
-        c1, c2 = st.columns(2)
-        with c1:
-            fig3 = px.pie(top_rec.head(10), names="Company", values="Colleges",
-                          color_discrete_sequence=GRAD, hole=0.4,
-                          title="Top 10 Recruiter Share")
-            fig3.update_traces(textfont_color="#e2e8f0", textfont_size=11)
-            st.plotly_chart(L(fig3), use_container_width=True)
-        with c2:
-            fig4 = px.pie(top_part.head(10), names="Company", values="Colleges",
-                          color_discrete_sequence=GRAD, hole=0.4,
-                          title="Top 10 Partner Share")
-            fig4.update_traces(textfont_color="#e2e8f0", textfont_size=11)
-            st.plotly_chart(L(fig4), use_container_width=True)
-
-    with tabs[2]:
-        section("Recruiter Network vs Placement Outcomes")
-        c1, c2 = st.columns(2)
-        with c1:
-            fig5 = px.scatter(fdf, x="Recruiter Count", y="Placement %",
-                              color="Tier", hover_name="College Name",
-                              size="Avg Pkg (LPA)", size_max=28,
-                              color_discrete_map=TIER_C,
-                              title="Recruiter Count vs Placement %")
-            fig5.update_traces(marker=dict(opacity=0.85))
-            st.plotly_chart(L(fig5), use_container_width=True)
-        with c2:
-            fig6 = px.scatter(fdf, x="Partner Count", y="Avg Pkg (LPA)",
-                              color="Tier", hover_name="College Name",
-                              size="Placement %", size_max=28,
-                              color_discrete_map=TIER_C,
-                              title="Industry Partners vs Avg Package")
-            st.plotly_chart(L(fig6), use_container_width=True)
-
-        section("Recruiter & Partner Count by Tier")
-        tier_net = fdf.groupby("Tier")[["Recruiter Count", "Partner Count"]].mean().reset_index()
-        fig7 = go.Figure()
-        fig7.add_trace(go.Bar(
-            name="Avg Recruiters", x=tier_net["Tier"], y=tier_net["Recruiter Count"].round(1),
-            marker_color="#6366f1", text=tier_net["Recruiter Count"].round(1),
-            textposition="outside", textfont=dict(color="#e2e8f0")
-        ))
-        fig7.add_trace(go.Bar(
-            name="Avg Partners", x=tier_net["Tier"], y=tier_net["Partner Count"].round(1),
-            marker_color="#06b6d4", text=tier_net["Partner Count"].round(1),
-            textposition="outside", textfont=dict(color="#e2e8f0")
-        ))
-        fig7.update_layout(**BASE, barmode="group", title="Network Depth by Tier")
-        st.plotly_chart(fig7, use_container_width=True)
-
-    with tabs[3]:
-        section("Internship Ecosystem")
-        all_intern = [c for lst in fdf["Internship Companies"] for c in lst]
-        intern_ctr = Counter(all_intern)
-        intern_df  = pd.DataFrame(intern_ctr.most_common(20), columns=["Company", "Count"])
-
-        c1, c2 = st.columns(2)
-        with c1:
-            fig8 = px.bar(intern_df.sort_values("Count"),
-                          x="Count", y="Company", orientation="h",
-                          color="Count", color_continuous_scale="Teal",
-                          title="Top 20 Internship Providers", text="Count")
-            fig8.update_traces(textposition="outside", textfont_color="#e2e8f0")
-            fig8.update_yaxes(tickfont=dict(size=11))
-            st.plotly_chart(L(fig8), use_container_width=True)
-        with c2:
-            fig9 = px.scatter(fdf, x="Internship Count", y="Placement %",
-                              color="Tier", hover_name="College Name",
-                              color_discrete_map=TIER_C, size="Avg Pkg (LPA)", size_max=25,
-                              title="Internship Variety vs Placement %")
-            st.plotly_chart(L(fig9), use_container_width=True)
-
-    footer()
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# PAGE 5 — COLLEGE COMPARISON TOOL
-# ══════════════════════════════════════════════════════════════════════════════
-elif page == "⚖️ College Comparison Tool":
-    hero("College Comparison Tool",
-         "Select any colleges and compare them side-by-side across every dimension",
-         "COMPARISON ENGINE")
-
-    all_colleges = sorted(fdf["College Name"].dropna().unique())
-    defaults     = all_colleges[:min(5, len(all_colleges))]
-    sel = st.multiselect("🔍 Select colleges to compare (up to 10)",
-                         all_colleges, default=defaults, max_selections=10)
-
-    if not sel:
-        st.info("Select at least 2 colleges above to begin comparison.")
-        st.stop()
-
-    cdf = fdf[fdf["College Name"].isin(sel)].copy()
-
-    st.markdown('<div class="stat-row">' + "".join([
-        f'<div class="stat-pill"><span>{r["College Name"].split("(")[0].strip()}</span>'
-        f' — {r["Tier"]} | ₹{r["Avg Pkg (LPA)"]} LPA | {r["Placement %"]}% placed</div>'
-        for _, r in cdf.iterrows()
-    ]) + '</div>', unsafe_allow_html=True)
-
-    tabs = st.tabs(["🕸️ Radar View", "📊 Bar Charts", "📈 Scatter", "📋 Data Table"])
-
-    with tabs[0]:
-        section("Multi-Metric Radar Comparison")
-        metrics = ["Placement %", "Avg Pkg (LPA)", "Highest Pkg (LPA)",
-                   "Student Intake", "Recruiter Count", "Partner Count"]
-        rdf = cdf[["College Name"] + metrics].dropna().copy()
-
-        def norm(s):
-            mn, mx = s.min(), s.max()
-            return (s - mn) / (mx - mn) * 100 if mx != mn else s * 0 + 50
-
-        for m in metrics:
-            rdf[m] = norm(rdf[m])
-
-        fig = go.Figure()
-        for i, (_, row) in enumerate(rdf.iterrows()):
-            v = [row[m] for m in metrics]
-            fig.add_trace(go.Scatterpolar(
-                r=v + [v[0]], theta=metrics + [metrics[0]],
-                fill="toself", name=row["College Name"],
-                line=dict(color=GRAD[i % len(GRAD)], width=2),
-                fillcolor=GRAD[i % len(GRAD)] + "20"
-            ))
-        fig.update_layout(
-            **BASE,
-            polar=dict(
-                bgcolor="rgba(6,11,24,0.8)",
-                radialaxis=dict(visible=True, range=[0, 100],
-                                tickfont=dict(color="#475569"),
-                                gridcolor="rgba(99,102,241,0.15)"),
-                angularaxis=dict(tickfont=dict(color="#94a3b8"),
-                                 gridcolor="rgba(99,102,241,0.15)")
-            ),
-            title="Normalised Multi-Metric Radar (100 = best in selection)"
-        )
-        st.plotly_chart(fig, use_container_width=True)
-
-    with tabs[1]:
-        section("Side-by-Side Bar Comparisons")
-        metrics_bar = {
-            "Placement %":          ("Placement %",       "Placement %"),
-            "Avg Package (LPA)":    ("Avg Pkg (LPA)",     "₹ LPA"),
-            "Highest Package (LPA)":("Highest Pkg (LPA)", "₹ LPA"),
-            "Student Intake":       ("Student Intake",    "Students"),
-        }
-        cols_iter = iter(st.columns(2))
-        for label, (col, unit) in metrics_bar.items():
-            c = next(cols_iter, None)
-            if c is None:
-                cols_iter = iter(st.columns(2)); c = next(cols_iter)
-            with c:
-                d = cdf.dropna(subset=[col]).sort_values(col, ascending=False)
-                fig = px.bar(d, x="College Name", y=col,
-                             color="College Name", color_discrete_sequence=GRAD,
-                             title=label, text=col)
-                fig.update_traces(texttemplate="%{text:.1f}", textposition="outside",
-                                  textfont_color="#e2e8f0")
-                fig.update_xaxes(tickangle=30, tickfont=dict(size=10))
-                st.plotly_chart(L(fig, showlegend=False), use_container_width=True)
-
-    with tabs[2]:
-        section("Placement vs Package Scatter")
-        fig2 = px.scatter(cdf, x="Avg Pkg (LPA)", y="Placement %",
-                          color="College Name", color_discrete_sequence=GRAD,
-                          size="Student Intake", size_max=40,
-                          hover_name="College Name", text="College Name",
-                          title="Package vs Placement (bubble = intake)")
-        fig2.update_traces(textposition="top center",
-                           textfont=dict(size=9, color="#e2e8f0"),
-                           marker=dict(opacity=0.85))
-        st.plotly_chart(L(fig2), use_container_width=True)
-
-        section("NIRF Rank vs ROI Score")
-        nirf_cdf = cdf.dropna(subset=["NIRF Rank"])
-        if len(nirf_cdf):
-            fig3 = px.scatter(nirf_cdf, x="NIRF Rank", y="ROI Score",
-                              color="College Name", color_discrete_sequence=GRAD,
-                              size="Avg Pkg (LPA)", size_max=35,
-                              hover_name="College Name", title="NIRF Rank vs ROI Score")
-            st.plotly_chart(L(fig3), use_container_width=True)
-
-    with tabs[3]:
-        section("Full Comparison Table")
-        show = ["College Name", "Tier", "Category", "State", "NIRF Rank", "NAAC/NBA Status",
-                "Placement %", "Avg Pkg (LPA)", "Highest Pkg (LPA)", "Student Intake",
-                "Recruiter Count", "Partner Count", "ROI Score", "Ownership Type"]
-        st.dataframe(cdf[show].set_index("College Name"), use_container_width=True)
-
-    footer()
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# PAGE 6 — ROI & VALUE ANALYSIS
-# ══════════════════════════════════════════════════════════════════════════════
-elif page == "💰 ROI & Value Analysis":
-    hero("ROI & Value Analysis",
-         "Which colleges deliver the best return on your educational investment?",
-         "VALUE INTELLIGENCE")
-
-    roi_df = fdf.dropna(subset=["Avg Pkg (LPA)", "Placement %"]).copy()
-    roi_df["ROI Score"]   = (roi_df["Placement %"] * roi_df["Avg Pkg (LPA)"] / 100).round(2)
-    roi_df["Value Grade"] = pd.cut(
-        roi_df["ROI Score"],
-        bins=[0, 10, 16, 22, 30],
-        labels=["C — Fair", "B — Good", "A — Great", "S — Exceptional"]
+        .reset_index()
+        .round(2)
     )
 
-    c1, c2, c3, c4, c5 = st.columns(5)
-    c1.metric("Top ROI Score",    f"{roi_df['ROI Score'].max():.1f}")
-    c2.metric("Avg ROI Score",    f"{roi_df['ROI Score'].mean():.1f}")
-    c3.metric("S-Grade Colleges", len(roi_df[roi_df["Value Grade"] == "S — Exceptional"]))
-    c4.metric("Best Value Tier",  roi_df.groupby("Tier")["ROI Score"].mean().idxmax())
-    c5.metric("Best Value State", roi_df.groupby("State")["ROI Score"].mean().idxmax())
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("States Covered", len(state_stats))
+    col2.metric("Total Colleges", len(filtered_df))
+    col3.metric("Best Avg Placement", f"{state_stats['Avg_Placement'].max():.1f}%" if len(state_stats) else "N/A")
+    col4.metric("Highest Avg Pkg", f"₹{state_stats['Avg_Package'].max():.1f} LPA" if len(state_stats) else "N/A")
 
-    tabs = st.tabs(["🏆 Overview", "📊 Grade Analysis", "📈 State ROI", "🔢 ROI Ranks", "📋 Full Table"])
-
-    with tabs[0]:
-        section("ROI Leaderboard — Top 20 Colleges")
-        top20_roi = roi_df.nlargest(20, "ROI Score")
+    col1, col2 = st.columns(2)
+    
+    with col1:
         fig = px.bar(
-            top20_roi.sort_values("ROI Score"),
-            x="ROI Score", y="College Name", orientation="h",
-            color="Value Grade",
-            color_discrete_map={
-                "S — Exceptional": "#6366f1",
-                "A — Great":       "#06b6d4",
-                "B — Good":        "#10b981",
-                "C — Fair":        "#f59e0b"
-            },
-            title="Top 20 Colleges by ROI Score", text="ROI Score"
+            state_stats.sort_values("College_Count", ascending=True),
+            x="College_Count", y="State", orientation="h",
+            color="College_Count", color_continuous_scale="Viridis",
+            title="Number of Colleges per State"
         )
-        fig.update_traces(texttemplate="%{text:.1f}", textposition="outside",
-                          textfont_color="#e2e8f0")
-        # FIX: ensure Y-axis labels are not overlapping
-        fig.update_yaxes(tickfont=dict(size=10))
-        st.plotly_chart(L(fig), use_container_width=True)
+        fig.update_layout(**PLOTLY_LAYOUT)
+        st.plotly_chart(fig, use_container_width=True)
 
-        section("ROI Bubble Matrix")
+    with col2:
+        fig2 = px.bar(
+            state_stats.sort_values("Avg_Placement", ascending=True),
+            x="Avg_Placement", y="State", orientation="h",
+            color="Avg_Placement", color_continuous_scale="Blues",
+            title="Average Placement % by State"
+        )
+        fig2.update_layout(**PLOTLY_LAYOUT)
+        st.plotly_chart(fig2, use_container_width=True)
+
+    st.markdown('<p class="section-header">Package & Intake Distribution</p>', unsafe_allow_html=True)
+    col3, col4 = st.columns(2)
+
+    with col3:
+        fig3 = px.bar(
+            state_stats.sort_values("Avg_Package", ascending=False),
+            x="State", y="Avg_Package",
+            color="Avg_Package", color_continuous_scale="Purples",
+            title="Average Package by State (LPA)"
+        )
+        fig3.update_layout(**PLOTLY_LAYOUT)
+        fig3.update_xaxes(tickangle=45)
+        st.plotly_chart(fig3, use_container_width=True)
+
+    with col4:
+        cat_state = filtered_df.groupby(["State", "Category"]).size().reset_index(name="Count")
+        fig4 = px.bar(
+            cat_state, x="State", y="Count", color="Category",
+            color_discrete_sequence=COLOR_PALETTE,
+            title="College Categories by State"
+        )
+        fig4.update_layout(**PLOTLY_LAYOUT)
+        fig4.update_xaxes(tickangle=45)
+        st.plotly_chart(fig4, use_container_width=True)
+
+    st.markdown('<p class="section-header">State-wise Summary Table</p>', unsafe_allow_html=True)
+    state_stats.columns = ["State", "College Count", "Avg Placement (%)", "Avg Package (LPA)", "Total Student Intake"]
+    st.dataframe(state_stats.sort_values("College Count", ascending=False).reset_index(drop=True),
+                 use_container_width=True)
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  PAGE 3 – PLACEMENT ANALYSIS
+# ═══════════════════════════════════════════════════════════════════════════
+elif page == "💼 Placement Analysis":
+    st.markdown('<p class="page-title">💼 Placement Analysis Dashboard</p>', unsafe_allow_html=True)
+    st.markdown('<p class="page-subtitle">Comprehensive placement metrics across India\'s top colleges</p>', unsafe_allow_html=True)
+
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("Avg Placement %", f"{filtered_df['Placement %'].mean():.1f}%")
+    col2.metric("Highest Placement", f"{filtered_df['Placement %'].max():.0f}%")
+    col3.metric("Avg Package", f"₹{filtered_df['Avg Pkg (LPA)'].mean():.1f} LPA")
+    col4.metric("Max Package", f"₹{filtered_df['Highest Pkg (LPA)'].max():.0f} LPA")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        fig = px.histogram(
+            filtered_df, x="Placement %", nbins=15,
+            color="Tier", color_discrete_map=TIER_COLORS,
+            title="Placement % Distribution by Tier",
+            barmode="overlay", opacity=0.8
+        )
+        fig.update_layout(**PLOTLY_LAYOUT)
+        st.plotly_chart(fig, use_container_width=True)
+
+    with col2:
+        tier_avg = filtered_df.groupby("Tier").agg(
+            Avg_Placement=("Placement %", "mean"),
+            Avg_Package=("Avg Pkg (LPA)", "mean")
+        ).reset_index()
+        
+        fig2 = go.Figure()
+        fig2.add_trace(go.Bar(name="Avg Placement %", x=tier_avg["Tier"], y=tier_avg["Avg_Placement"],
+                              marker_color="#6366f1", yaxis="y"))
+        fig2.add_trace(go.Bar(name="Avg Package (LPA)", x=tier_avg["Tier"], y=tier_avg["Avg_Package"],
+                              marker_color="#06b6d4", yaxis="y2"))
+        fig2.update_layout(
+            **PLOTLY_LAYOUT,
+            title="Placement % & Package by Tier",
+            yaxis=dict(title="Placement %", gridcolor="#1e293b", tickfont=dict(color="#64748b")),
+            yaxis2=dict(title="Avg Package (LPA)", overlaying="y", side="right", tickfont=dict(color="#64748b")),
+            barmode="group"
+        )
+        st.plotly_chart(fig2, use_container_width=True)
+
+    st.markdown('<p class="section-header">Category-wise Placement Insights</p>', unsafe_allow_html=True)
+    col3, col4 = st.columns(2)
+
+    with col3:
+        cat_stats = filtered_df.groupby("Category").agg(
+            Avg_Placement=("Placement %", "mean"),
+            Avg_Package=("Avg Pkg (LPA)", "mean"),
+            Count=("College Name", "count")
+        ).reset_index()
+        
+        fig3 = px.scatter(
+            cat_stats, x="Avg_Package", y="Avg_Placement",
+            size="Count", color="Category",
+            color_discrete_sequence=COLOR_PALETTE,
+            text="Category",
+            title="Category: Placement % vs Avg Package"
+        )
+        fig3.update_traces(textposition="top center")
+        fig3.update_layout(**PLOTLY_LAYOUT)
+        st.plotly_chart(fig3, use_container_width=True)
+
+    with col4:
+        top20 = filtered_df.nlargest(20, "Placement %")
+        fig4 = px.bar(
+            top20.sort_values("Placement %"),
+            x="Placement %", y="College Name", orientation="h",
+            color="Tier", color_discrete_map=TIER_COLORS,
+            title="Top 20 Colleges by Placement %"
+        )
+        fig4.update_layout(**PLOTLY_LAYOUT)
+        st.plotly_chart(fig4, use_container_width=True)
+
+    st.markdown('<p class="section-header">Package Range Analysis</p>', unsafe_allow_html=True)
+    col5, col6 = st.columns(2)
+
+    with col5:
+        fig5 = px.box(
+            filtered_df.dropna(subset=["Avg Pkg (LPA)"]),
+            x="Category", y="Avg Pkg (LPA)",
+            color="Category", color_discrete_sequence=COLOR_PALETTE,
+            title="Average Package Distribution by Category"
+        )
+        fig5.update_layout(**PLOTLY_LAYOUT)
+        fig5.update_xaxes(tickangle=30)
+        st.plotly_chart(fig5, use_container_width=True)
+
+    with col6:
+        fig6 = px.scatter(
+            filtered_df.dropna(subset=["Avg Pkg (LPA)", "Highest Pkg (LPA)"]),
+            x="Avg Pkg (LPA)", y="Highest Pkg (LPA)",
+            color="Tier", hover_name="College Name",
+            color_discrete_map=TIER_COLORS,
+            title="Avg Package vs Highest Package"
+        )
+        fig6.update_layout(**PLOTLY_LAYOUT)
+        st.plotly_chart(fig6, use_container_width=True)
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  PAGE 4 – RECRUITER ANALYTICS
+# ═══════════════════════════════════════════════════════════════════════════
+elif page == "🤝 Recruiter Analytics":
+    st.markdown('<p class="page-title">🤝 Recruiter Analytics Dashboard</p>', unsafe_allow_html=True)
+    st.markdown('<p class="page-subtitle">Top recruiters, industry partnerships & hiring patterns</p>', unsafe_allow_html=True)
+
+    # Parse recruiters
+    def split_list(val):
+        if pd.isna(val):
+            return []
+        return [r.strip() for r in str(val).split(",") if r.strip()]
+
+    all_recruiters = []
+    for _, row in filtered_df.iterrows():
+        all_recruiters.extend(split_list(row["Top Recruiters"]))
+    
+    all_partners = []
+    for _, row in filtered_df.iterrows():
+        all_partners.extend(split_list(row["Industry Partnerships"]))
+
+    recruiter_counts = Counter(all_recruiters)
+    partner_counts = Counter(all_partners)
+
+    top_recruiters = pd.DataFrame(recruiter_counts.most_common(20), columns=["Recruiter", "College Count"])
+    top_partners = pd.DataFrame(partner_counts.most_common(20), columns=["Partner", "College Count"])
+
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("Unique Recruiters", len(recruiter_counts))
+    col2.metric("Unique Industry Partners", len(partner_counts))
+    col3.metric("Top Recruiter", recruiter_counts.most_common(1)[0][0] if recruiter_counts else "N/A")
+    col4.metric("Colleges Analyzed", len(filtered_df))
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        fig = px.bar(
+            top_recruiters.sort_values("College Count"),
+            x="College Count", y="Recruiter", orientation="h",
+            color="College Count", color_continuous_scale="Viridis",
+            title="Top 20 Recruiters (by college presence)"
+        )
+        fig.update_layout(**PLOTLY_LAYOUT)
+        st.plotly_chart(fig, use_container_width=True)
+
+    with col2:
+        fig2 = px.bar(
+            top_partners.sort_values("College Count"),
+            x="College Count", y="Partner", orientation="h",
+            color="College Count", color_continuous_scale="Plasma",
+            title="Top 20 Industry Partners"
+        )
+        fig2.update_layout(**PLOTLY_LAYOUT)
+        st.plotly_chart(fig2, use_container_width=True)
+
+    st.markdown('<p class="section-header">Recruiter Reach by College Tier</p>', unsafe_allow_html=True)
+    
+    # Count recruiters per college
+    filtered_df["Recruiter Count"] = filtered_df["Top Recruiters"].apply(
+        lambda x: len(split_list(x))
+    )
+    filtered_df["Partner Count"] = filtered_df["Industry Partnerships"].apply(
+        lambda x: len(split_list(x))
+    )
+
+    col3, col4 = st.columns(2)
+
+    with col3:
+        fig3 = px.scatter(
+            filtered_df,
+            x="Recruiter Count", y="Placement %",
+            color="Tier", size="Avg Pkg (LPA)",
+            hover_name="College Name",
+            color_discrete_map=TIER_COLORS,
+            title="Recruiter Count vs Placement %"
+        )
+        fig3.update_layout(**PLOTLY_LAYOUT)
+        st.plotly_chart(fig3, use_container_width=True)
+
+    with col4:
+        tier_rec = filtered_df.groupby("Tier")[["Recruiter Count", "Partner Count"]].mean().reset_index()
+        fig4 = go.Figure()
+        fig4.add_trace(go.Bar(name="Avg Recruiters", x=tier_rec["Tier"], y=tier_rec["Recruiter Count"], marker_color="#6366f1"))
+        fig4.add_trace(go.Bar(name="Avg Partners", x=tier_rec["Tier"], y=tier_rec["Partner Count"], marker_color="#06b6d4"))
+        fig4.update_layout(**PLOTLY_LAYOUT, title="Avg Recruiters & Partners by Tier", barmode="group")
+        st.plotly_chart(fig4, use_container_width=True)
+
+    st.markdown('<p class="section-header">Top 10 Recruiter Breakdown</p>', unsafe_allow_html=True)
+    st.dataframe(
+        top_recruiters.rename(columns={"College Count": "Number of Colleges Recruiting From"}),
+        use_container_width=True
+    )
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  PAGE 5 – COLLEGE COMPARISON
+# ═══════════════════════════════════════════════════════════════════════════
+elif page == "⚖️ College Comparison":
+    st.markdown('<p class="page-title">⚖️ College Comparison Dashboard</p>', unsafe_allow_html=True)
+    st.markdown('<p class="page-subtitle">Compare colleges side-by-side across key metrics</p>', unsafe_allow_html=True)
+
+    all_colleges = sorted(filtered_df["College Name"].dropna().unique())
+    
+    default_colleges = all_colleges[:min(5, len(all_colleges))]
+    selected_colleges = st.multiselect(
+        "Select Colleges to Compare (max 10)", all_colleges,
+        default=default_colleges, max_selections=10
+    )
+
+    if selected_colleges:
+        comp_df = filtered_df[filtered_df["College Name"].isin(selected_colleges)]
+
+        st.markdown('<p class="section-header">Radar Chart – Multi-Metric Comparison</p>', unsafe_allow_html=True)
+
+        metrics = ["Placement %", "Avg Pkg (LPA)", "Highest Pkg (LPA)", "Student Intake", "Alumni Network Strength"]
+        
+        # Normalize 0-100 for radar
+        def normalize(series):
+            mn, mx = series.min(), series.max()
+            if mx == mn:
+                return series * 0 + 50
+            return (series - mn) / (mx - mn) * 100
+
+        radar_df = comp_df[["College Name"] + [m for m in metrics if m in comp_df.columns]].copy()
+        for m in metrics:
+            if m in radar_df.columns:
+                radar_df[m] = normalize(radar_df[m])
+
+        fig_radar = go.Figure()
+        for i, (_, row) in enumerate(radar_df.iterrows()):
+            vals = [row[m] for m in metrics if m in row]
+            fig_radar.add_trace(go.Scatterpolar(
+                r=vals + [vals[0]],
+                theta=metrics + [metrics[0]],
+                fill="toself",
+                name=row["College Name"],
+                line=dict(color=COLOR_PALETTE[i % len(COLOR_PALETTE)])
+            ))
+        fig_radar.update_layout(
+            **PLOTLY_LAYOUT,
+            polar=dict(
+                bgcolor="rgba(15,23,42,0.6)",
+                radialaxis=dict(visible=True, range=[0, 100], tickfont=dict(color="#64748b")),
+                angularaxis=dict(tickfont=dict(color="#94a3b8"))
+            ),
+            title="Normalized Multi-Metric Radar Comparison"
+        )
+        st.plotly_chart(fig_radar, use_container_width=True)
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            fig2 = px.bar(
+                comp_df.sort_values("Placement %", ascending=False),
+                x="College Name", y="Placement %",
+                color="College Name", color_discrete_sequence=COLOR_PALETTE,
+                title="Placement % Comparison"
+            )
+            fig2.update_layout(**PLOTLY_LAYOUT)
+            fig2.update_xaxes(tickangle=30)
+            st.plotly_chart(fig2, use_container_width=True)
+
+        with col2:
+            fig3 = px.bar(
+                comp_df.sort_values("Avg Pkg (LPA)", ascending=False),
+                x="College Name", y="Avg Pkg (LPA)",
+                color="College Name", color_discrete_sequence=COLOR_PALETTE,
+                title="Average Package Comparison (LPA)"
+            )
+            fig3.update_layout(**PLOTLY_LAYOUT)
+            fig3.update_xaxes(tickangle=30)
+            st.plotly_chart(fig3, use_container_width=True)
+
+        col3, col4 = st.columns(2)
+
+        with col3:
+            fig4 = px.bar(
+                comp_df.dropna(subset=["Highest Pkg (LPA)"]).sort_values("Highest Pkg (LPA)", ascending=False),
+                x="College Name", y="Highest Pkg (LPA)",
+                color="College Name", color_discrete_sequence=COLOR_PALETTE,
+                title="Highest Package Comparison (LPA)"
+            )
+            fig4.update_layout(**PLOTLY_LAYOUT)
+            fig4.update_xaxes(tickangle=30)
+            st.plotly_chart(fig4, use_container_width=True)
+
+        with col4:
+            fig5 = px.bar(
+                comp_df.dropna(subset=["Student Intake"]).sort_values("Student Intake", ascending=False),
+                x="College Name", y="Student Intake",
+                color="Tier", color_discrete_map=TIER_COLORS,
+                title="Student Intake Comparison"
+            )
+            fig5.update_layout(**PLOTLY_LAYOUT)
+            fig5.update_xaxes(tickangle=30)
+            st.plotly_chart(fig5, use_container_width=True)
+
+        st.markdown('<p class="section-header">Detailed Comparison Table</p>', unsafe_allow_html=True)
+        show_cols = ["College Name", "Category", "State", "Tier", "NIRF Rank",
+                     "NAAC/NBA Status", "Placement %", "Avg Pkg", "Highest Pkg",
+                     "Student Intake", "Ownership Type"]
+        st.dataframe(comp_df[show_cols].reset_index(drop=True), use_container_width=True)
+    else:
+        st.info("Please select at least one college to compare.")
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  PAGE 6 – ROI ANALYSIS
+# ═══════════════════════════════════════════════════════════════════════════
+elif page == "💰 ROI Analysis":
+    st.markdown('<p class="page-title">💰 ROI Analysis Dashboard</p>', unsafe_allow_html=True)
+    st.markdown('<p class="page-subtitle">Return on Investment — Placement outcomes vs education investment proxy</p>', unsafe_allow_html=True)
+
+    roi_df = filtered_df.dropna(subset=["Avg Pkg (LPA)", "Placement %"]).copy()
+    roi_df["ROI Score"] = (roi_df["Placement %"] * roi_df["Avg Pkg (LPA)"] / 100).round(2)
+    roi_df["Placement Efficiency"] = (roi_df["Placement %"] / 100 * roi_df["Avg Pkg (LPA)"]).round(2)
+
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("Top ROI Score", f"{roi_df['ROI Score'].max():.1f}")
+    col2.metric("Avg ROI Score", f"{roi_df['ROI Score'].mean():.1f}")
+    col3.metric("Best Value Tier", roi_df.groupby("Tier")["ROI Score"].mean().idxmax())
+    col4.metric("Colleges Ranked", len(roi_df))
+
+    st.markdown('<p class="section-header">ROI Leaderboard</p>', unsafe_allow_html=True)
+    col1, col2 = st.columns(2)
+
+    with col1:
+        top_roi = roi_df.nlargest(15, "ROI Score")
+        fig = px.bar(
+            top_roi.sort_values("ROI Score"),
+            x="ROI Score", y="College Name", orientation="h",
+            color="Tier", color_discrete_map=TIER_COLORS,
+            title="Top 15 Colleges by ROI Score"
+        )
+        fig.update_layout(**PLOTLY_LAYOUT)
+        st.plotly_chart(fig, use_container_width=True)
+
+    with col2:
         fig2 = px.scatter(
             roi_df, x="Avg Pkg (LPA)", y="Placement %",
             size="ROI Score", color="Tier",
-            color_discrete_map=TIER_C,
             hover_name="College Name",
-            size_max=40,
-            # FIX: add opacity so overlapping bubbles are visible
-            title="ROI Metric: Package vs Placement (bubble = ROI score)"
+            color_discrete_map=TIER_COLORS,
+            title="ROI Matrix: Package vs Placement (bubble = ROI score)"
         )
-        fig2.update_traces(marker=dict(opacity=0.65, line=dict(width=1, color="rgba(255,255,255,0.15)")))
-        st.plotly_chart(L(fig2), use_container_width=True)
+        fig2.update_layout(**PLOTLY_LAYOUT)
+        st.plotly_chart(fig2, use_container_width=True)
 
-    with tabs[1]:
-        section("Grade Distribution")
-        c1, c2 = st.columns(2)
-        with c1:
-            grade_df = roi_df.groupby("Value Grade", observed=True).size().reset_index(name="Count")
-            fig3 = px.pie(grade_df, names="Value Grade", values="Count",
-                          color_discrete_sequence=["#6366f1", "#06b6d4", "#10b981", "#f59e0b"],
-                          hole=0.45, title="Colleges by Value Grade")
-            fig3.update_traces(textfont_color="#e2e8f0", textfont_size=12)
-            st.plotly_chart(L(fig3), use_container_width=True)
-        with c2:
-            grade_tier = roi_df.groupby(["Tier", "Value Grade"], observed=True).size().reset_index(name="Count")
-            fig4 = px.bar(grade_tier, x="Tier", y="Count", color="Value Grade",
-                          color_discrete_map={
-                              "S — Exceptional": "#6366f1",
-                              "A — Great":       "#06b6d4",
-                              "B — Good":        "#10b981",
-                              "C — Fair":        "#f59e0b"
-                          },
-                          title="Grade Distribution by Tier", barmode="stack")
-            st.plotly_chart(L(fig4), use_container_width=True)
+    st.markdown('<p class="section-header">ROI by Category & Tier</p>', unsafe_allow_html=True)
+    col3, col4 = st.columns(2)
 
-    with tabs[2]:
-        section("State-wise ROI Analysis")
-        state_roi = roi_df.groupby("State").agg(
-            Avg_ROI=("ROI Score", "mean"),
-            Count=("College Name", "count")
-        ).reset_index().round(2)
-        fig5 = px.bar(state_roi.sort_values("Avg_ROI", ascending=True),
-                      x="Avg_ROI", y="State", orientation="h",
-                      color="Avg_ROI", color_continuous_scale="Viridis",
-                      title="Average ROI Score by State",
-                      text=state_roi.sort_values("Avg_ROI")["Avg_ROI"].apply(lambda x: f"{x:.1f}"))
-        fig5.update_traces(textposition="outside", textfont_color="#e2e8f0")
-        fig5.update_yaxes(tickfont=dict(size=11))
-        st.plotly_chart(L(fig5), use_container_width=True)
+    with col3:
+        cat_roi = roi_df.groupby("Category")["ROI Score"].mean().reset_index().sort_values("ROI Score", ascending=False)
+        fig3 = px.bar(
+            cat_roi, x="Category", y="ROI Score",
+            color="ROI Score", color_continuous_scale="Viridis",
+            title="Average ROI Score by Category"
+        )
+        fig3.update_layout(**PLOTLY_LAYOUT)
+        fig3.update_xaxes(tickangle=30)
+        st.plotly_chart(fig3, use_container_width=True)
 
-    with tabs[3]:
-        section("ROI Ranks — Full Leaderboard")
-        roi_ranked = roi_df.sort_values("ROI Score", ascending=False).reset_index(drop=True)
-        roi_ranked.index += 1
-        roi_ranked.index.name = "Rank"
-        display_cols = ["College Name", "Tier", "Category", "State",
-                        "Placement %", "Avg Pkg (LPA)", "ROI Score", "Value Grade"]
-        st.dataframe(roi_ranked[display_cols], use_container_width=True, height=500)
+    with col4:
+        fig4 = px.box(
+            roi_df, x="Tier", y="ROI Score",
+            color="Tier", color_discrete_map=TIER_COLORS,
+            title="ROI Score Distribution by Tier"
+        )
+        fig4.update_layout(**PLOTLY_LAYOUT)
+        st.plotly_chart(fig4, use_container_width=True)
 
-    with tabs[4]:
-        section("Complete ROI Dataset")
-        full_cols = ["College Name", "Tier", "Category", "State", "NIRF Rank",
-                     "Placement %", "Avg Pkg (LPA)", "Highest Pkg (LPA)",
-                     "ROI Score", "Value Grade", "Recruiter Count", "Partner Count"]
-        st.dataframe(roi_df[full_cols].sort_values("ROI Score", ascending=False)
-                     .reset_index(drop=True), use_container_width=True)
+    st.markdown('<p class="section-header">ROI vs NIRF Rank</p>', unsafe_allow_html=True)
+    fig5 = px.scatter(
+        roi_df.dropna(subset=["NIRF Rank"]),
+        x="NIRF Rank", y="ROI Score",
+        color="Category", hover_name="College Name",
+        color_discrete_sequence=COLOR_PALETTE,
+        trendline="lowess",
+        title="ROI Score vs NIRF Rank (lower rank = better ranked)"
+    )
+    fig5.update_layout(**PLOTLY_LAYOUT)
+    st.plotly_chart(fig5, use_container_width=True)
 
-    footer()
+    st.markdown('<p class="section-header">Full ROI Rankings Table</p>', unsafe_allow_html=True)
+    roi_table = roi_df[["College Name", "Category", "State", "Tier", "Placement %",
+                         "Avg Pkg (LPA)", "Highest Pkg (LPA)", "ROI Score", "NIRF Rank"]] \
+        .sort_values("ROI Score", ascending=False).reset_index(drop=True)
+    roi_table.index += 1
+    st.dataframe(roi_table, use_container_width=True, height=450)
+
+    st.markdown("""
+    <div class="info-card" style="margin-top:16px;">
+      <b style="color:#e2e8f0;">📌 ROI Score Methodology</b><br>
+      <p>ROI Score = (Placement % × Avg Package LPA) / 100 — a composite proxy that rewards colleges 
+      delivering both high placement rates AND competitive packages. A score of 25 means a college 
+      placing 100% at 25 LPA average, or 83% at 30 LPA.</p>
+    </div>
+    """, unsafe_allow_html=True)
