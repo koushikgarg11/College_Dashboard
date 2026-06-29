@@ -325,53 +325,52 @@ if page == "🏠 Overview & Highlights":
                 <p class="name">{name}</p>
             </div>""", unsafe_allow_html=True)
 
-    # ── Top 10 by Average Package ────────────────────────────────────────────────
-sec("Top 10 Colleges by Average Package")
+      # ── Top 10 by Average Package ────────────────────────────────────────────────
+    sec("Top 10 Colleges by Average Package")
 
-# Keep only Tier 1 colleges
-top10 = (
-    fdf[
-        (fdf["Tier"] == "Tier 1") &
-        (fdf["Avg Pkg (LPA)"].notna())
-    ]
-    .nlargest(10, "Avg Pkg (LPA)")
-    .sort_values("Avg Pkg (LPA)", ascending=True)
-)
+    top10 = (
+        fdf[
+            (fdf["Tier"] == "Tier 1") &
+            (fdf["Avg Pkg (LPA)"].notna())
+        ]
+        .nlargest(10, "Avg Pkg (LPA)")
+        .sort_values("Avg Pkg (LPA)", ascending=True)
+    )
 
-fig6 = px.bar(
-    top10,
-    x="Avg Pkg (LPA)",
-    y="College Name",
-    orientation="h",
-    color="Avg Pkg (LPA)",              # Color based on package
-    color_continuous_scale="Purples",   # Professional gradient
-    text="Avg Pkg Range",
-    title="Top 10 Tier 1 Colleges by Average Package",
-    hover_data={
-        "Placement %": True,
-        "Category": True,
-        "NIRF Rank": True,
-        "Avg Pkg (LPA)": ":.1f",
-    },
-)
+    fig6 = px.bar(
+        top10,
+        x="Avg Pkg (LPA)",
+        y="College Name",
+        orientation="h",
+        color="Avg Pkg (LPA)",
+        color_continuous_scale="Purples",
+        text="Avg Pkg Range",
+        title="Top 10 Tier 1 Colleges by Average Package",
+        hover_data={
+            "Placement %": True,
+            "Category": True,
+            "NIRF Rank": True,
+            "Avg Pkg (LPA)": ":.1f",
+        },
+    )
 
-fig6.update_traces(
-    textposition="outside",
-    textfont_color="#e2e8f0",
-    marker_line_width=0,
-)
+    fig6.update_traces(
+        textposition="outside",
+        textfont_color="#e2e8f0",
+        marker_line_width=0,
+    )
 
-fig6.update_layout(
-    showlegend=False,
-    coloraxis_showscale=False,   # Hide color scale on right
-    xaxis_title="Average Package (LPA)",
-    yaxis_title="",
-)
+    fig6.update_layout(
+        showlegend=False,
+        coloraxis_showscale=False,
+        xaxis_title="Average Package (LPA)",
+        yaxis_title="",
+    )
 
-st.plotly_chart(
-    L(fig6),
-    use_container_width=True
-)
+    st.plotly_chart(
+        L(fig6),
+        use_container_width=True,
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
